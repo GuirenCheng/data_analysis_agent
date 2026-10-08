@@ -1,0 +1,91 @@
+services:
+  # ── Vue 前端（Nginx 静态页面 + /api 反向代理到后端）────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: daa-frontend
+    ports:
+      - "8080:80"   # 宿主机 8080 → 容器内 nginx 80
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # ── FastAPI 服务 ─────────────────────────
+  api:
+    build: .
+    container_name: daa-api
+    ports:
+      - "8000:8000"   # 仅调试用；生产环境可注释掉这一行
+    env_file: .env
+    environment:
+      - MYSQL_HOST=mysql
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./outputs:/app/outputs
+      - ./uploads:/app/uploads
+      - ./chroma_data:/app/chroma_data
+    restart: unless-stopped
+
+  # ── ARQ 后台任务 Worker（真正执行 LLM 分析工作流）───────
+  worker:
+    build: .
+    container_name: daa-worker
+    command: arq daa.workers.worker.WorkerSettings
+    env_file: .env
+    environment:
+      - MYSQL_HOST=mysql
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./outputs:/app/outputs
+      - ./uploads:/app/uploads
+      - ./chroma_data:/app/chroma_data
+    restart: unless-stopped
+
+  # ── MySQL 8.0 ───────────────────────────
+  mysql:
+    image: mysql:8.0
+    container_name: daa-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      MYSQL_DATABASE: data_analysis_agent
+      MYSQL_USER: daa
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-daa_password}
+    # 不暴露宿主机端口，仅容器内网访问
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root_password}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ── Redis 7 ─────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: daa-redis
+    # 不暴露宿主机端口
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  redis_data:

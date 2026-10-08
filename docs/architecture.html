@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>data_analysis_agent 架构图</title>
+  <style>
+    body {
+      font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+      margin: 0 auto;
+      max-width: 1080px;
+      padding: 32px 24px 80px;
+      background: #f7f8fa;
+      color: #1f2328;
+    }
+    h1 { font-size: 24px; border-bottom: 2px solid #d0d7de; padding-bottom: 12px; }
+    h2 { font-size: 19px; margin-top: 48px; color: #0969da; }
+    p.hint { color: #57606a; font-size: 13px; }
+    .mermaid {
+      background: #fff;
+      border: 1px solid #d0d7de;
+      border-radius: 10px;
+      padding: 24px;
+      margin-top: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06);
+      text-align: center;
+    }
+    .legend { font-size: 13px; color: #57606a; margin-top: 12px; line-height: 1.9; }
+  </style>
+</head>
+<body>
+  <h1>data_analysis_agent 架构图</h1>
+  <p class="hint">用 Mermaid 绘制，双击可缩放；离线环境下请保持联网以加载 CDN。</p>
+
+  <h2>1. 分析工作流状态图（LangGraph 状态机）</h2>
+  <div class="mermaid">
+flowchart TD
+    START([开始]) --> initialize
+
+    subgraph main_loop["主循环（LLM 决策 → 执行 → 回 LLM）"]
+        call_llm{{call_llm<br/>调 LLM 解析 action<br/>current_round +1}}
+
+        execute_code[execute_code<br/>沙箱执行代码]
+        collect_figures[collect_figures<br/>收集图表元数据]
+        error_handler[error_handler<br/>构建错误反馈<br/>error_count +1]
+    end
+
+    generate_report[generate_report<br/>汇总结果 · 调 LLM 生成报告 · 存盘]
+
+    initialize[initialize<br/>建会话目录 · 初始化 IPython · 拼首轮提示词] --> call_llm
+
+    call_llm -->|action = generate_code| execute_code
+    call_llm -->|action = collect_figures| collect_figures
+    call_llm -->|action = analysis_complete| generate_report
+    call_llm -->|action = 其他/unknown| error_handler
+
+    execute_code -->|continue: 继续下一轮| call_llm
+    execute_code -->|stop: 达到 max_rounds / 连续错误≥3 / 已完成| generate_report
+
+    collect_figures -->|回到 LLM 继续分析| call_llm
+
+    error_handler -->|retry: error_count &lt; 3 且未达上限| call_llm
+    error_handler -->|abort: 放弃重试| generate_report
+
+    generate_report --> END([结束])
+
+    classDef init fill:#dbeafe,stroke:#2563eb,color:#1e3a8a;
+    classDef llm fill:#ede9fe,stroke:#7c3aed,color:#4c1d95;
+    classDef exec fill:#dcfce7,stroke:#16a34a,color:#14532d;
+    classDef report fill:#ffedd5,stroke:#ea580c,color:#7c2d12;
+    classDef err fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+    classDef term fill:#e5e7eb,stroke:#4b5563,color:#111827;
+
+    class initialize init;
+    class call_llm llm;
+    class execute_code,collect_figures exec;
+    class generate_report report;
+    class error_handler err;
+    class START,END term;
+  </div>
+  <div class="legend">
+    🔵 <b>initialize</b> 初始化　·　🟣 <b>call_llm</b> LLM 决策　·　🟢 <b>execute_code / collect_figures</b> 执行与收集<br/>
+    🟠 <b>generate_report</b> 生成最终报告（终点）　·　🔴 <b>error_handler</b> 错误恢复<br/>
+    <b>终止条件</b>：LLM 返回 analysis_complete　或　current_round ≥ max_rounds　或　连续错误 error_count ≥ 3
+  </div>
+
+  <h2>2. 数据库 ER 图（5 张业务表）</h2>
+  <div class="mermaid">
+erDiagram
+    USERS ||--o{ ANALYSIS_SESSIONS : "发起 1:N"
+    USERS ||--o{ ANALYSIS_FILES : "上传 1:N"
+    USERS ||--o| USER_CONFIGS : "拥有 1:1"
+
+    ANALYSIS_SESSIONS ||--o{ ANALYSIS_STEPS : "包含 1:N"
+    ANALYSIS_SESSIONS ||--o{ ANALYSIS_FILES : "关联 1:N（可空）"
+
+    USERS {
+        char36 id PK "UUID 主键"
+        varchar username "唯一"
+        varchar email "唯一"
+        varchar password_hash
+        bool is_active
+    }
+    ANALYSIS_SESSIONS {
+        char36 id PK
+        char36 user_id FK "→ users (CASCADE)"
+        text query
+        enum status "pending/running/completed/failed/cancelled"
+        int max_rounds
+        int current_round
+        varchar report_path
+        float progress
+    }
+    ANALYSIS_STEPS {
+        char36 id PK
+        char36 session_id FK "→ sessions (CASCADE)"
+        int round_number
+        varchar action
+        mediumtext code
+        mediumtext response_text
+        text execution_output
+        text execution_error
+        bool execution_success
+        json figures_collected
+    }
+    ANALYSIS_FILES {
+        char36 id PK
+        char36 user_id FK "→ users (CASCADE)"
+        char36 session_id FK "→ sessions (SET NULL)"
+        varchar original_name
+        varchar stored_path
+        bigint file_size
+        json columns_detected
+        int row_count
+    }
+    USER_CONFIGS {
+        char36 id PK
+        char36 user_id FK "→ users (CASCADE, UNIQUE)"
+        varchar llm_provider
+        varchar llm_model
+        varchar llm_api_key_encrypted
+        float temperature
+        int max_tokens
+    }
+  </div>
+  <div class="legend">
+    ⚠️ <b>rag_documents</b> 仅在 <code>scripts/init.sql</code> 里定义，无 ORM 模型、无代码读写——实际 RAG 用嵌入式 ChromaDB，此表为遗留死表，故未画入。
+  </div>
+
+  <script type="module">
+    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+    mermaid.initialize({ startOnLoad: true, theme: 'default', securityLevel: 'loose' });
+  </script>
+</body>
+</html>
