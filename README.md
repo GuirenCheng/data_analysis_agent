@@ -135,22 +135,22 @@ data_analysis_agent/
 ### LangGraph 工作流状态机
 
 ```mermaid
-graph TD
-    START((start)) --> INIT[initialize<br/>创建会话目录<br/>初始化 IPython]
+flowchart TD
+    START((开始)) --> INIT[initialize<br/>创建会话目录<br/>初始化 IPython]
     INIT --> LLM[call_llm<br/>构建 Prompt<br/>调用 LLM 获取 action]
     LLM --> ROUTE{route_by_action}
     ROUTE -->|generate_code| EXEC[execute_code<br/>提取代码<br/>AST 安全检查<br/>IPython 沙箱执行]
     ROUTE -->|collect_figures| COLLECT[collect_figures<br/>验证文件<br/>累积图表元数据]
-    ROUTE -->|analysis_complete| REPORT[generate_report<br/>汇总图表/代码<br/>LLM 生成 Markdown]
-    ROUTE -->|未知/异常| ERROR[error_handler<br/>构建错误反馈<br/>更新错误计数]
+    ROUTE -->|analysis_complete| REPORT[generate_report<br/>汇总图表和代码<br/>LLM 生成 Markdown]
+    ROUTE -->|未知或异常| ERROR[error_handler<br/>构建错误反馈<br/>更新错误计数]
     EXEC --> CONT{should_continue}
     CONT -->|continue| LLM
-    CONT -->|达到上限/完成| REPORT
+    CONT -->|达到上限或完成| REPORT
     COLLECT --> LLM
     ERROR --> RETRY{should_retry}
-    RETRY -->|连续错误 &lt; 3| LLM
-    RETRY -->|连续错误 ≥ 3| REPORT
-    REPORT --> END((end))
+    RETRY -->|连续错误不足3次| LLM
+    RETRY -->|连续错误达到3次| REPORT
+    REPORT --> END((结束))
 
     style INIT fill:#e3f2fd
     style LLM fill:#fff3e0
@@ -164,35 +164,35 @@ graph TD
 
 ```mermaid
 sequenceDiagram
-    participant Browser as 浏览器 (Vue 3)
+    participant Browser as 浏览器 Vue3
     participant API as FastAPI
-    participant Queue as Redis/ARQ
+    participant Queue as Redis 和 ARQ
     participant Worker as ARQ Worker
     participant LLM as LLM API
     participant IPython as IPython 沙箱
     participant Chroma as ChromaDB
 
-    Browser->>API: POST /api/v1/sessions (JWT)
-    API->>API: 创建会话记录 (MySQL)
+    Browser->>API: POST /api/v1/sessions（携带 JWT）
+    API->>API: 创建会话记录（MySQL）
     API->>Queue: enqueue 分析任务
-    API-->>Browser: 201 Created (session_id)
+    API-->>Browser: 201 Created（返回 session_id）
 
     Worker->>Queue: 拉取任务
-    Worker->>Worker: run_analysis()
+    Worker->>Worker: run_analysis
     loop LangGraph 状态机循环
         Worker->>LLM: 发送分析上下文
-        LLM-->>Worker: YAML 响应 (action + code)
-        Worker->>IPython: AST 检查 → 沙箱执行
-        IPython-->>Worker: 执行结果 / 图表
+        LLM-->>Worker: YAML 响应（action 和 code）
+        Worker->>IPython: AST 检查后沙箱执行
+        IPython-->>Worker: 执行结果或图表
         Worker->>Queue: 更新 Redis 进度
     end
     Worker->>Worker: 生成 Markdown 报告
-    Worker->>Chroma: 索引报告内容 (RAG)
+    Worker->>Chroma: 索引报告内容（RAG）
     Worker->>Queue: 标记 completed
 
-    Browser->>API: GET /analyses/{id}/stream (SSE)
+    Browser->>API: GET /analyses/session_id/stream（SSE）
     API->>Queue: 轮询 Redis 进度
-    API-->>Browser: text/event-stream (实时进度)
+    API-->>Browser: text/event-stream 实时进度
 ```
 
 ## ✨ 核心特性
