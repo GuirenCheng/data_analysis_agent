@@ -19,11 +19,11 @@ def test_execute_simple_code(executor):
 
 
 def test_execute_pandas(executor):
-    """执行 pandas 代码。"""
+    """执行 pandas 代码，DataFrame 返回值应被格式化为表格。"""
     code = """
 import pandas as pd
 df = pd.DataFrame({'a': [1, 2, 3], 'b': [4, 5, 6]})
-print(df.shape)
+df
 """
     result = executor.execute_code(code)
     assert result["success"]

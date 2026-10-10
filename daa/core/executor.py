@@ -3,6 +3,7 @@
 从 utils/code_executor.py 重构，集成增强的 AST 安全检查器。
 """
 
+import inspect
 import os
 import traceback
 from contextlib import redirect_stderr, redirect_stdout
@@ -16,6 +17,9 @@ from IPython.core.interactiveshell import InteractiveShell
 from IPython.utils.capture import capture_output
 
 from daa.core.safety import check_code_safety
+
+# 预导入的数据科学库模块（用于环境信息展示）
+_DATA_MODULE_ROOTS = {"pandas", "numpy", "matplotlib", "duckdb", "scipy", "sklearn"}
 
 
 class CodeExecutor:
@@ -116,18 +120,20 @@ from IPython.display import display
                 result = self.shell.run_cell(code)
 
             if result.error_before_exec:
+                err = result.error_before_exec
                 return {
                     "success": False,
                     "output": captured.stdout or "",
-                    "error": f"执行前错误: {result.error_before_exec}",
+                    "error": f"执行前错误: {type(err).__name__}: {err}",
                     "variables": {},
                 }
 
             if result.error_in_exec:
+                err = result.error_in_exec
                 return {
                     "success": False,
                     "output": captured.stdout or "",
-                    "error": f"执行错误: {result.error_in_exec}",
+                    "error": f"执行错误: {type(err).__name__}: {err}",
                     "variables": {},
                 }
 
@@ -202,7 +208,12 @@ from IPython.display import display
             if var_name.startswith("_") or var_name in skip_vars:
                 continue
             try:
-                if hasattr(var_value, "shape"):
+                if inspect.ismodule(var_value):
+                    # 预导入的数据科学库模块（pd/np/plt/duckdb...）
+                    mod_name = getattr(var_value, "__name__", var_name)
+                    if mod_name.split(".")[0] in _DATA_MODULE_ROOTS:
+                        important_vars[var_name] = f"预装模块: {mod_name}"
+                elif hasattr(var_value, "shape"):
                     important_vars[var_name] = (
                         f"{type(var_value).__name__} with shape {var_value.shape}"
                     )
@@ -210,12 +221,6 @@ from IPython.display import display
                     important_vars[var_name] = str(var_value)
                 elif isinstance(var_value, (int, float, str, bool)) and len(str(var_value)) < 100:
                     important_vars[var_name] = f"{type(var_value).__name__}: {var_value}"
-                elif hasattr(var_value, "__module__") and var_value.__module__ in (
-                    "pandas",
-                    "numpy",
-                    "matplotlib.pyplot",
-                ):
-                    important_vars[var_name] = f"导入的模块: {var_value.__module__}"
             except Exception:
                 continue
 
