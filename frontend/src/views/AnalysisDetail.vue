@@ -162,6 +162,8 @@ onMounted(() => {
     if (evt && (evt.status === "completed" || evt.status === "failed")) {
       store.stopStream(sid);
       loadDetail();
+      // 任务已结束，停止轮询，避免持续请求触发限流
+      if (pollTimer.value) clearInterval(pollTimer.value);
     } else if (
       session.value &&
       (session.value.status === "pending" || session.value.status === "running")

@@ -1,8 +1,7 @@
 """速率限制中间件。"""
 
-import time
-
-from fastapi import HTTPException, Request, status
+from fastapi import Request, status
+from fastapi.responses import JSONResponse
 
 from daa.db.redis import get_redis
 from daa.settings import get_settings
@@ -34,14 +33,14 @@ async def rate_limit_middleware(request: Request, call_next):
         if current is None:
             await redis.setex(key, 60, 1)
         elif int(current) >= settings.RATE_LIMIT_PER_MINUTE:
-            raise HTTPException(
+            # 直接返回 429 响应。在 BaseHTTPMiddleware 里 raise HTTPException
+            # 会被外层 ServerErrorMiddleware 当成 500 处理，导致前端看到 500。
+            return JSONResponse(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="请求过于频繁，请稍后再试",
+                content={"detail": "请求过于频繁，请稍后再试"},
             )
         else:
             await redis.incr(key)
-    except HTTPException:
-        raise
     except Exception:
         # Redis 读写异常时同样放行，保证业务请求不受限流组件影响
         pass
