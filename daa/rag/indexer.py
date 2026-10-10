@@ -58,6 +58,7 @@ class RAGIndexer:
         user_id: str,
         session_id: str,
         steps: list,
+        user_query: str = "",
     ) -> int:
         """索引一个分析会话的所有步骤。
 
@@ -65,6 +66,7 @@ class RAGIndexer:
             user_id: 用户 ID
             session_id: 会话 ID
             steps: AnalysisStep ORM 实例列表
+            user_query: 会话的原始用户查询（索引到 analysis_queries，而非 LLM 响应）
 
         Returns:
             索引的文档块总数
@@ -72,21 +74,24 @@ class RAGIndexer:
         embedder = self._get_embedder()
         total_count = 0
 
+        # 索引用户原始查询（会话的问题本身，而非 LLM 响应）
+        if user_query:
+            count = await self._index_text(
+                collection_name="analysis_queries",
+                user_id=user_id,
+                session_id=session_id,
+                content_type="query",
+                text=user_query[:2000],
+                embedder=embedder,
+            )
+            total_count += count
+
         for step in steps:
-            # 索引查询（每个会话的第一轮）
-            if step.round_number == 1 and step.response_text:
-                count = await self._index_text(
-                    collection_name="analysis_queries",
-                    user_id=user_id,
-                    session_id=session_id,
-                    content_type="query",
-                    text=step.response_text[:2000],  # 截断过长的响应
-                    embedder=embedder,
-                )
-                total_count += count
 
             # 索引成功的代码
-            if step.action == "generate_code" and step.execution_success and step.code:
+            # 注：worker 落库时 action 记为 "execute_code"，而协议/提示词里用 "generate_code"，
+            # 两者都认，避免代码步骤漏索引。
+            if step.action in ("generate_code", "execute_code") and step.execution_success and step.code:
                 chunks = self.splitter.split_code(step.code)
                 for chunk in chunks:
                     count = await self._index_text(

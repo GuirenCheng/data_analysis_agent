@@ -68,6 +68,11 @@ async def index_session(
         索引的文档块数量
     """
     from daa.models.analysis_step import AnalysisStep
+    from daa.models.session import AnalysisSession
+
+    # 获取会话的原始用户查询（索引到 analysis_queries 用）
+    session = await db.get(AnalysisSession, session_id)
+    user_query = session.query if session else ""
 
     # 获取会话的所有步骤
     result = await db.execute(
@@ -77,7 +82,7 @@ async def index_session(
     )
     steps = list(result.scalars().all())
 
-    if not steps:
+    if not steps and not user_query:
         return 0
 
     try:
@@ -87,6 +92,7 @@ async def index_session(
             user_id=user_id,
             session_id=session_id,
             steps=steps,
+            user_query=user_query,
         )
         return count
     except Exception:

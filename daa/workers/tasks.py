@@ -113,9 +113,16 @@ async def run_analysis_task(
             )
             await db.commit()
 
-        # RAG 索引
+        # RAG 索引（失败时静默降级，不影响主流程）
         try:
             from daa.rag.indexer import RAGIndexer
+            from daa.services.rag_service import index_session
+
+            # 索引中间步骤（用户查询 / 代码 / 图表描述）
+            async with factory() as db:
+                await index_session(db, session_id=session_id, user_id=user_id)
+
+            # 索引最终报告
             indexer = RAGIndexer()
             await indexer.index_report(
                 user_id=user_id,
