@@ -24,7 +24,7 @@
           <el-option label="查询" value="query" />
           <el-option label="代码" value="code" />
           <el-option label="报告" value="report" />
-          <el-option label="图表" value="figure" />
+          <el-option label="图表" value="figure_caption" />
         </el-select>
       </div>
 
@@ -58,7 +58,7 @@ const searching = ref(false);
 const results = ref<RagResult[]>([]);
 
 function typeColor(type: string) {
-  const map: Record<string, any> = { query: "", code: "success", report: "warning", figure: "info" };
+  const map: Record<string, any> = { query: "", code: "success", report: "warning", figure_caption: "info" };
   return map[type] || "";
 }
 

@@ -3,7 +3,8 @@
 from dataclasses import dataclass, field
 from typing import Optional
 
-from daa.rag.embedder import Embedder
+from daa.rag.chroma import get_chroma_client
+from daa.rag.embedder import Embedder, get_embedder
 from daa.settings import get_settings
 
 
@@ -38,19 +39,14 @@ class RAGRetriever:
 
     def _get_embedder(self) -> Embedder:
         if self._embedder is None:
-            self._embedder = Embedder()
+            self._embedder = get_embedder()
         return self._embedder
 
     async def _get_chroma(self):
-        """懒加载 ChromaDB 客户端。"""
+        """懒加载 ChromaDB 客户端（进程级单例）。"""
         if self._chroma_client is None:
             try:
-                import chromadb
-                from daa.settings import get_settings
-                settings = get_settings()
-                self._chroma_client = chromadb.PersistentClient(
-                    path=settings.CHROMA_PERSIST_DIR
-                )
+                self._chroma_client = get_chroma_client()
             except Exception:
                 return None
         return self._chroma_client

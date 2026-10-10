@@ -1,5 +1,7 @@
 """文本嵌入器 — 使用 OpenAI 兼容的 embedding API 生成向量。"""
 
+from functools import lru_cache
+
 from langchain_openai import OpenAIEmbeddings
 
 from daa.settings import get_settings
@@ -32,3 +34,9 @@ class Embedder:
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         """批量生成嵌入向量。"""
         return self._embeddings.embed_documents(texts)
+
+
+@lru_cache()
+def get_embedder() -> Embedder:
+    """返回进程级共享的 Embedder 单例，避免每次请求重建 OpenAIEmbeddings。"""
+    return Embedder()
