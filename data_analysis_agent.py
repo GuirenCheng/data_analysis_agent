@@ -15,7 +15,7 @@ from utils.create_session_dir import create_session_output_dir
 from utils.format_execution_result import format_execution_result
 from utils.extract_code import extract_code_from_response
 from utils.llm_helper import LLMHelper
-from utils.code_executor import CodeExecutor
+from daa.core.executor import CodeExecutor
 from config.llm_config import LLMConfig
 from prompts import data_analysis_system_prompt, final_report_system_prompt
 

@@ -1,7 +1,4 @@
-"""安全的代码执行器 — 基于 IPython 提供持久化的代码执行沙箱。
-
-从 utils/code_executor.py 重构，集成增强的 AST 安全检查器。
-"""
+"""安全的代码执行器 — 基于 IPython 提供持久化的代码执行沙箱，集成增强的 AST 安全检查器。"""
 
 import inspect
 import os
