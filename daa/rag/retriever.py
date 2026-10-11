@@ -92,11 +92,14 @@ class RAGRetriever:
         rerank_candidate_n = settings.RERANK_CANDIDATE_N
 
         types_to_search = content_types or list(self._collections.keys())
-        all_results: list[RAGContext] = []
 
-        # 召回：每个 collection 取比 top_k 更多的候选，供 rerank 精排。
-        # ChromaDB 按余弦距离返回，数量不足时自动返回实际存在的条数。
+        # 每个 collection 的召回数。关键：召回后**不要**按余弦全局/分类型截断到
+        # top-N，否则小集合（如报告，可能只有十几条）里真正相关的内容会被余弦
+        # 排名挤出去，出现「全部搜不到、限定单一类型才搜得到」的现象。全部交给
+        # reranker 精排，让它自行挑出相关的。
         recall_k = max(top_k, rerank_candidate_n)
+
+        all_results: list[RAGContext] = []
 
         for content_type in types_to_search:
             collection_name = self._collections.get(content_type)
@@ -138,18 +141,17 @@ class RAGRetriever:
                     metadata=metadata,
                 ))
 
-        # 按余弦相似度降序，取前 N 条候选交给 reranker 精排
+        # 按余弦相似度降序（供 rerank 关闭/失败时的回退排序）
         all_results.sort(key=lambda x: x.similarity, reverse=True)
-        candidates = all_results[:rerank_candidate_n]
 
-        # 二次精排：用交叉编码器重新打分，并按相关性分数阈值过滤
-        if settings.RERANK_ENABLED and candidates:
+        # 二次精排：把所有召回的候选都交给 reranker（不截断），并按相关性分数阈值过滤
+        if settings.RERANK_ENABLED and all_results:
             from daa.rag.reranker import rerank
 
-            scores = await rerank(current_query, [c.content_text for c in candidates])
+            scores = await rerank(current_query, [c.content_text for c in all_results])
             if scores is not None:
                 scored = [
-                    (ctx, s) for ctx, s in zip(candidates, scores)
+                    (ctx, s) for ctx, s in zip(all_results, scores)
                     if s >= settings.RERANK_THRESHOLD
                 ]
                 scored.sort(key=lambda x: x[1], reverse=True)

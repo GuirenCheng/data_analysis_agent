@@ -113,7 +113,7 @@ class Settings(BaseSettings):
     RERANK_BASE_URL: Optional[str] = None
     # rerank 相关性分数阈值：低于此值的候选被丢弃（交叉编码器分数比余弦可靠得多）
     RERANK_THRESHOLD: float = 0.3
-    # 参与重排序的候选数量（从各 collection 召回后取余弦相似度最高的 N 条）
+    # 每个内容类型召回的候选数（rerank 前，越多召回越全、rerank 成本越高）
     RERANK_CANDIDATE_N: int = 30
 
 
