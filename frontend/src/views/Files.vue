@@ -60,7 +60,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from "vue";
+import { ref, reactive, onMounted } from "vue";
 import { filesApi } from "@/api/files";
 import { ElMessage, ElMessageBox } from "element-plus";
 import dayjs from "dayjs";
@@ -70,6 +70,14 @@ import type { UploadFile } from "element-plus";
 const files = ref<FileOut[]>([]);
 const previewVisible = ref(false);
 const previewData = reactive({ columns: [] as string[], rows: [] as any[][], total_rows: 0 });
+
+onMounted(async () => {
+  try {
+    files.value = await filesApi.list();
+  } catch {
+    // 错误已在拦截器中处理
+  }
+});
 
 function formatSize(bytes?: number) {
   if (!bytes) return "-";

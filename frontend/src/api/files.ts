@@ -2,6 +2,10 @@ import client from "./client";
 import type { FileOut, FilePreview } from "@/types";
 
 export const filesApi = {
+  list(): Promise<FileOut[]> {
+    return client.get("/files").then((r) => r.data);
+  },
+
   upload(file: File): Promise<{ file: FileOut; message: string }> {
     const form = new FormData();
     form.append("file", file);

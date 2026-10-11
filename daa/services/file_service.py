@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 import pandas as pd
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from daa.models.analysis_file import AnalysisFile
@@ -89,6 +89,16 @@ async def get_file(
         )
     )
     return result.scalar_one_or_none()
+
+
+async def list_user_files(db: AsyncSession, user_id: str) -> list[AnalysisFile]:
+    """列出用户的所有上传文件（按创建时间倒序）。"""
+    result = await db.execute(
+        select(AnalysisFile)
+        .where(AnalysisFile.user_id == user_id)
+        .order_by(desc(AnalysisFile.created_at))
+    )
+    return list(result.scalars().all())
 
 
 async def delete_file(db: AsyncSession, file_id: str, user_id: str) -> bool:

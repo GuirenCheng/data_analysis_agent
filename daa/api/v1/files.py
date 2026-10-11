@@ -11,12 +11,23 @@ from daa.schemas.file import FileOut, FilePreviewOut, FileUploadResponse
 from daa.services.file_service import (
     delete_file,
     get_file,
+    list_user_files,
     preview_file,
     save_uploaded_file,
 )
 from daa.settings import get_settings
 
 router = APIRouter(prefix="/files")
+
+
+@router.get("", response_model=list[FileOut])
+async def list_files(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """列出当前用户上传的所有文件（按创建时间倒序）。"""
+    files = await list_user_files(db, user.id)
+    return [FileOut.model_validate(f) for f in files]
 
 
 @router.post("/upload", response_model=FileUploadResponse)
