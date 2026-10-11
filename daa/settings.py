@@ -88,7 +88,8 @@ class Settings(BaseSettings):
     RAG_CHUNK_OVERLAP: int = 100
     RAG_TOP_K: int = 5
     # 检索到历史内容的余弦相似度阈值，低于此值的片段会被丢弃（防止无关上下文诱发幻觉）
-    RAG_SIMILARITY_THRESHOLD: float = 0.3
+    # 0.5 = 50%：低于 50% 相似度的召回一律丢弃（硬过滤，减少无关内容）
+    RAG_SIMILARITY_THRESHOLD: float = 0.5
 
     # ── Embedding（RAG 嵌入向量）──────────────────
     # DeepSeek 不提供 embedding 接口，需单独配置一个 OpenAI 兼容的 embedding 服务
