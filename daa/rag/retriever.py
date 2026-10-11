@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from daa.rag.chroma import get_chroma_client
-from daa.rag.embedder import Embedder, get_embedder
+from daa.rag.embedder import Embedder, EmbeddingUnavailableError, get_embedder
 from daa.settings import get_settings
 
 
@@ -76,6 +76,9 @@ class RAGRetriever:
         embedder = self._get_embedder()
         try:
             query_embedding = embedder.embed_text(current_query)
+        except EmbeddingUnavailableError:
+            # 嵌入服务不可用：向上抛出，让搜索 API 返回明确错误而非静默空结果
+            raise
         except Exception as e:
             print(
                 f"⚠️ 查询嵌入失败（请检查 EMBEDDING_API_KEY/BASE_URL，"

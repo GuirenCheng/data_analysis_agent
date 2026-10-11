@@ -2,12 +2,13 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from daa.db.session import get_db
 from daa.middleware.auth import get_current_user
 from daa.models.user import User
+from daa.rag.embedder import EmbeddingUnavailableError
 from daa.schemas.rag import RagSearchResponse, RagSearchResult
 from daa.services.rag_service import search_similar
 
@@ -26,9 +27,15 @@ async def search_rag(
 
     支持的 content_type: query, code, report, figure_caption
     """
-    results = await search_similar(
-        db, user.id, q, top_k=top_k, content_type=content_type
-    )
+    try:
+        results = await search_similar(
+            db, user.id, q, top_k=top_k, content_type=content_type
+        )
+    except EmbeddingUnavailableError:
+        raise HTTPException(
+            status_code=503,
+            detail="知识搜索暂不可用：向量嵌入服务连接失败，请稍后重试",
+        )
 
     return RagSearchResponse(
         results=[RagSearchResult(**r) for r in results],

@@ -28,6 +28,8 @@ async def search_similar(
     Returns:
         相似结果列表
     """
+    from daa.rag.embedder import EmbeddingUnavailableError
+
     # 尝试从 ChromaDB 检索
     try:
         from daa.rag.retriever import RAGRetriever
@@ -47,6 +49,9 @@ async def search_similar(
             }
             for r in results
         ]
+    except EmbeddingUnavailableError:
+        # 嵌入服务不可用：向上抛给 API 返回明确错误，而非静默空结果
+        raise
     except Exception:
         pass
 

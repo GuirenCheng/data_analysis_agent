@@ -7,6 +7,10 @@ from langchain_openai import OpenAIEmbeddings
 from daa.settings import get_settings
 
 
+class EmbeddingUnavailableError(RuntimeError):
+    """向量嵌入服务不可用（连接失败等），用于区分「没搜到」与「搜不了」。"""
+
+
 class Embedder:
     """文本嵌入器封装。
 
@@ -18,22 +22,43 @@ class Embedder:
     """
 
     def __init__(self):
+        self._embeddings = self._build_embeddings()
+
+    def _build_embeddings(self):
         settings = get_settings()
         api_key = settings.EMBEDDING_API_KEY or settings.LLM_API_KEY
         base_url = settings.EMBEDDING_BASE_URL or settings.LLM_BASE_URL
-        self._embeddings = OpenAIEmbeddings(
+        return OpenAIEmbeddings(
             model=settings.EMBEDDING_MODEL,
             api_key=api_key,
             base_url=base_url,
         )
 
     def embed_text(self, text: str) -> list[float]:
-        """生成单个文本的嵌入向量。"""
-        return self._embeddings.embed_query(text)
+        """生成单个文本的嵌入向量。
+
+        首次失败时重建底层 OpenAI 客户端重试一次，以自愈 keep-alive
+        连接被服务端关闭导致的偶发 ``Connection error``。
+        """
+        try:
+            return self._embeddings.embed_query(text)
+        except Exception as first_error:
+            try:
+                self._embeddings = self._build_embeddings()
+                return self._embeddings.embed_query(text)
+            except Exception:
+                raise EmbeddingUnavailableError(str(first_error)) from first_error
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         """批量生成嵌入向量。"""
-        return self._embeddings.embed_documents(texts)
+        try:
+            return self._embeddings.embed_documents(texts)
+        except Exception as first_error:
+            try:
+                self._embeddings = self._build_embeddings()
+                return self._embeddings.embed_documents(texts)
+            except Exception:
+                raise EmbeddingUnavailableError(str(first_error)) from first_error
 
 
 @lru_cache()
