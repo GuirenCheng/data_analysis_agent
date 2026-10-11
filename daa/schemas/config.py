@@ -9,6 +9,7 @@ class UserConfigOut(BaseModel):
     """用户配置响应。"""
 
     id: str
+    use_custom_llm: bool = False
     llm_provider: str = "openai"
     llm_model: str = ""
     llm_base_url: Optional[str] = None
@@ -25,6 +26,7 @@ class UserConfigOut(BaseModel):
 class UserConfigUpdate(BaseModel):
     """用户配置更新请求。"""
 
+    use_custom_llm: Optional[bool] = None
     llm_provider: Optional[str] = None
     llm_model: Optional[str] = None
     llm_base_url: Optional[str] = None

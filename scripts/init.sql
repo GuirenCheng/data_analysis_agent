@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS analysis_files (
 CREATE TABLE IF NOT EXISTS user_configs (
     id CHAR(36) PRIMARY KEY,
     user_id CHAR(36) NOT NULL UNIQUE,
+    use_custom_llm BOOLEAN NOT NULL DEFAULT FALSE,
     llm_provider VARCHAR(64) DEFAULT 'openai',
     llm_model VARCHAR(128) DEFAULT 'gpt-4-turbo-preview',
     llm_base_url VARCHAR(512),

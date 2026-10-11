@@ -54,6 +54,18 @@ async def run_analysis(
     except Exception as e:
         print(f"⚠️ RAG 检索失败（将跳过历史参考）: {e}")
 
+    # 读取用户自定义 LLM 配置（未启用时回退到全局 .env，失败不影响主流程）
+    llm_config = None
+    try:
+        from daa.db.session import get_session_factory
+        from daa.services.config_service import get_user_llm_overrides
+
+        factory = await get_session_factory()
+        async with factory() as db:
+            llm_config = await get_user_llm_overrides(db, user_id)
+    except Exception as e:
+        print(f"⚠️ 读取用户 LLM 配置失败（将使用全局配置）: {e}")
+
     initial_state: AnalysisState = {
         "user_query": user_query,
         "file_paths": file_paths,
@@ -64,6 +76,7 @@ async def run_analysis(
         "analysis_results": [],
         "collected_figures": [],
         "rag_context": rag_context,
+        "llm_config": llm_config,
         "action": "",
         "error_count": 0,
         "final_report": "",

@@ -10,6 +10,7 @@ def create_chat_model(
     temperature: float | None = None,
     max_tokens: int | None = None,
     streaming: bool = False,
+    llm_config: dict | None = None,
 ) -> ChatOpenAI:
     """创建 LangChain ChatOpenAI 实例。
 
@@ -21,18 +22,32 @@ def create_chat_model(
         temperature: 温度参数
         max_tokens: 最大 token 数
         streaming: 是否启用流式输出
+        llm_config: 用户级覆盖配置（model/base_url/api_key/temperature/max_tokens），
+            为空或字段为空时回退到全局 settings
 
     Returns:
         ChatOpenAI 实例（可能带有 fallback 链）
     """
     settings = get_settings()
+    cfg = llm_config or {}
+
+    final_model = model or cfg.get("model") or settings.LLM_MODEL
+    if temperature is not None:
+        final_temperature = temperature
+    elif cfg.get("temperature") is not None:
+        final_temperature = cfg["temperature"]
+    else:
+        final_temperature = settings.LLM_TEMPERATURE
+    final_max_tokens = max_tokens or cfg.get("max_tokens") or settings.LLM_MAX_TOKENS
+    final_api_key = cfg.get("api_key") or settings.LLM_API_KEY
+    final_base_url = cfg.get("base_url") or settings.LLM_BASE_URL
 
     primary = ChatOpenAI(
-        model=model or settings.LLM_MODEL,
-        temperature=temperature if temperature is not None else settings.LLM_TEMPERATURE,
-        max_tokens=max_tokens or settings.LLM_MAX_TOKENS,
-        api_key=settings.LLM_API_KEY,
-        base_url=settings.LLM_BASE_URL,
+        model=final_model,
+        temperature=final_temperature,
+        max_tokens=final_max_tokens,
+        api_key=final_api_key,
+        base_url=final_base_url,
         streaming=streaming,
         max_retries=1,
         timeout=120,
@@ -55,7 +70,19 @@ def create_chat_model(
     return primary
 
 
-def create_report_chat_model() -> ChatOpenAI:
-    """创建用于报告生成的 LLM，使用更大的 max_tokens。"""
-    settings = get_settings()
-    return create_chat_model(max_tokens=16384, temperature=0.3)
+def create_report_chat_model(llm_config: dict | None = None) -> ChatOpenAI:
+    """创建用于报告生成的 LLM，使用更大的 max_tokens 与更稳定的低温。
+
+    报告生成沿用用户配置的模型 / 接口 / 密钥，但 temperature 与 max_tokens
+    保持报告专用值（0.3 / 16384），保证输出稳定。
+    """
+    cfg = llm_config or {}
+    return create_chat_model(
+        model=cfg.get("model") or None,
+        temperature=0.3,
+        max_tokens=16384,
+        llm_config={
+            "api_key": cfg.get("api_key") or "",
+            "base_url": cfg.get("base_url") or "",
+        },
+    )

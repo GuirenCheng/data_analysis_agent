@@ -51,7 +51,7 @@ async def report_node(state: AnalysisState) -> dict:
     )
 
     # 调用 LLM 生成报告
-    chat_model = create_report_chat_model()
+    chat_model = create_report_chat_model(llm_config=state.get("llm_config"))
 
     from daa.llm.prompts import build_report_prompt_template
 

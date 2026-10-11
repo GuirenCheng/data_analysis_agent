@@ -34,6 +34,7 @@ class AnalysisState(TypedDict, total=False):
     collected_figures: NotRequired[list[dict[str, Any]]]  # 累积的图表元数据
     notebook_variables: NotRequired[str]  # IPython 环境变量信息字符串
     rag_context: NotRequired[str]  # RAG 检索到的上下文字符串
+    llm_config: NotRequired[dict]  # 用户级 LLM 覆盖配置（None 表示使用全局默认）
 
     # ── 控制流 ─────────────────────────
     action: NotRequired[str]  # generate_code | collect_figures | analysis_complete

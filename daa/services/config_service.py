@@ -36,6 +36,7 @@ async def update_user_config(
         return None
 
     allowed_fields = {
+        "use_custom_llm",
         "llm_provider",
         "llm_model",
         "llm_base_url",
@@ -54,3 +55,27 @@ async def update_user_config(
 
     await db.flush()
     return config
+
+
+async def get_user_llm_overrides(
+    db: AsyncSession, user_id: str
+) -> Optional[dict]:
+    """读取用户的自定义 LLM 配置，用于在分析任务中覆盖全局默认。
+
+    仅在用户显式启用「自定义模型配置」时返回覆盖字典；否则返回 None，
+    此时分析流程回退到 .env 里的全局 LLM 配置。
+    """
+    result = await db.execute(
+        select(UserConfig).where(UserConfig.user_id == user_id)
+    )
+    config = result.scalar_one_or_none()
+    if not config or not config.use_custom_llm:
+        return None
+
+    return {
+        "model": config.llm_model or "",
+        "base_url": config.llm_base_url or "",
+        "api_key": config.llm_api_key_encrypted or "",
+        "temperature": config.temperature,
+        "max_tokens": config.max_tokens,
+    }

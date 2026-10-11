@@ -37,7 +37,7 @@ async def llm_node(state: AnalysisState) -> dict:
     Returns:
         状态更新字典
     """
-    chat_model = create_chat_model()
+    chat_model = create_chat_model(llm_config=state.get("llm_config"))
     prompt_template = build_analysis_prompt_template()
     chain = prompt_template | chat_model
 

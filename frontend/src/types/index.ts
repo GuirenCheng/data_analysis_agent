@@ -115,6 +115,7 @@ export interface FilePreview {
 // ── 配置 ──────────────────────────
 export interface UserConfig {
   id: string;
+  use_custom_llm: boolean;
   llm_provider: string;
   llm_model: string;
   llm_base_url?: string;
@@ -125,6 +126,7 @@ export interface UserConfig {
 }
 
 export interface UserConfigUpdate {
+  use_custom_llm?: boolean;
   llm_provider?: string;
   llm_model?: string;
   llm_base_url?: string;
