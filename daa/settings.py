@@ -97,6 +97,24 @@ class Settings(BaseSettings):
     EMBEDDING_API_KEY: Optional[str] = None
     EMBEDDING_BASE_URL: Optional[str] = None
     EMBEDDING_MODEL: str = "BAAI/bge-m3"
+    # bge 系列为「query vs 文档」检索训练，查询侧需加指令前缀以更好对齐；
+    # 留空则不加（仅用于文档侧，不加指令）。
+    EMBEDDING_QUERY_INSTRUCTION: str = (
+        "Represent this sentence for searching relevant passages: "
+    )
+
+    # ── Rerank（RAG 检索后二次精排）──────────────────
+    # 稠密向量的余弦相似度基线偏高（无关内容也 0.6+），单靠阈值无法区分相关/无关；
+    # 用交叉编码器 reranker 对候选重新打分，能真正拉开差距。
+    RERANK_ENABLED: bool = True
+    RERANK_MODEL: str = "BAAI/bge-reranker-v2-m3"
+    # 留空则回退到 EMBEDDING_API_KEY / EMBEDDING_BASE_URL（SiliconFlow 同一套）
+    RERANK_API_KEY: Optional[str] = None
+    RERANK_BASE_URL: Optional[str] = None
+    # rerank 相关性分数阈值：低于此值的候选被丢弃（交叉编码器分数比余弦可靠得多）
+    RERANK_THRESHOLD: float = 0.3
+    # 参与重排序的候选数量（从各 collection 召回后取余弦相似度最高的 N 条）
+    RERANK_CANDIDATE_N: int = 30
 
 
 @lru_cache()

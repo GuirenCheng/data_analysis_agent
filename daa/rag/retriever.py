@@ -75,7 +75,8 @@ class RAGRetriever:
 
         embedder = self._get_embedder()
         try:
-            query_embedding = embedder.embed_text(current_query)
+            # 查询侧加 bge 指令前缀，与文档侧向量正确对齐
+            query_embedding = embedder.embed_query(current_query)
         except EmbeddingUnavailableError:
             # 嵌入服务不可用：向上抛出，让搜索 API 返回明确错误而非静默空结果
             raise
@@ -86,10 +87,16 @@ class RAGRetriever:
             )
             return []
 
-        threshold = get_settings().RAG_SIMILARITY_THRESHOLD
+        settings = get_settings()
+        threshold = settings.RAG_SIMILARITY_THRESHOLD
+        rerank_candidate_n = settings.RERANK_CANDIDATE_N
 
         types_to_search = content_types or list(self._collections.keys())
         all_results: list[RAGContext] = []
+
+        # 召回：每个 collection 取比 top_k 更多的候选，供 rerank 精排。
+        # ChromaDB 按余弦距离返回，数量不足时自动返回实际存在的条数。
+        recall_k = max(top_k, rerank_candidate_n)
 
         for content_type in types_to_search:
             collection_name = self._collections.get(content_type)
@@ -104,7 +111,7 @@ class RAGRetriever:
             try:
                 results = collection.query(
                     query_embeddings=[query_embedding],
-                    n_results=top_k,
+                    n_results=recall_k,
                     where={"user_id": user_id},
                     include=["documents", "metadatas", "distances"],
                 )
@@ -114,7 +121,7 @@ class RAGRetriever:
             if not results["ids"] or not results["ids"][0]:
                 continue
 
-            for i, doc_id in enumerate(results["ids"][0]):
+            for i in range(len(results["ids"][0])):
                 doc_text = results["documents"][0][i] if results["documents"] and results["documents"][0] else ""
                 metadata = results["metadatas"][0][i] if results["metadatas"] and results["metadatas"][0] else {}
                 distance = results["distances"][0][i] if results["distances"] and results["distances"][0] else 1.0
@@ -122,10 +129,7 @@ class RAGRetriever:
                 # 距离转相似度 (cosine distance → similarity)
                 similarity = max(0.0, 1.0 - float(distance))
 
-                # 丢弃低于阈值的无关片段，避免无关历史内容诱发幻觉
-                if similarity < threshold:
-                    continue
-
+                # 余弦阶段先不过滤，交给 rerank 精排（余弦基线偏高，硬阈值误杀严重）
                 all_results.append(RAGContext(
                     content_text=doc_text,
                     content_type=content_type,
@@ -134,9 +138,28 @@ class RAGRetriever:
                     metadata=metadata,
                 ))
 
-        # 按相似度降序排列
+        # 按余弦相似度降序，取前 N 条候选交给 reranker 精排
         all_results.sort(key=lambda x: x.similarity, reverse=True)
-        return all_results[:top_k]
+        candidates = all_results[:rerank_candidate_n]
+
+        # 二次精排：用交叉编码器重新打分，并按相关性分数阈值过滤
+        if settings.RERANK_ENABLED and candidates:
+            from daa.rag.reranker import rerank
+
+            scores = await rerank(current_query, [c.content_text for c in candidates])
+            if scores is not None:
+                scored = [
+                    (ctx, s) for ctx, s in zip(candidates, scores)
+                    if s >= settings.RERANK_THRESHOLD
+                ]
+                scored.sort(key=lambda x: x[1], reverse=True)
+                for ctx, s in scored[:top_k]:
+                    ctx.similarity = round(s, 4)  # 用 rerank 分数替换余弦相似度
+                return [ctx for ctx, _ in scored[:top_k]]
+
+        # 回退：rerank 关闭/失败时，用余弦相似度 + 硬阈值
+        filtered = [c for c in all_results if c.similarity >= threshold]
+        return filtered[:top_k]
 
 
 def format_rag_context_for_prompt(contexts: list[RAGContext]) -> str:

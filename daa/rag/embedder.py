@@ -39,6 +39,8 @@ class Embedder:
 
         首次失败时重建底层 OpenAI 客户端重试一次，以自愈 keep-alive
         连接被服务端关闭导致的偶发 ``Connection error``。
+
+        注意：此方法用于「文档侧」文本，不加查询指令前缀。
         """
         try:
             return self._embeddings.embed_query(text)
@@ -48,6 +50,17 @@ class Embedder:
                 return self._embeddings.embed_query(text)
             except Exception:
                 raise EmbeddingUnavailableError(str(first_error)) from first_error
+
+    def embed_query(self, text: str) -> list[float]:
+        """生成「查询侧」嵌入向量。
+
+        bge 系列模型在 query 与文档之间是「检索对齐」训练的，查询侧需加指令
+        前缀（如 ``Represent this sentence for searching relevant passages: ``）
+        才能和文档侧向量正确对齐；文档侧保持裸文本。配置里把该指令留空则退化
+        为普通 embedding（等价于 ``embed_text``）。
+        """
+        instruction = get_settings().EMBEDDING_QUERY_INSTRUCTION or ""
+        return self.embed_text(instruction + text)
 
     def embed_texts(self, texts: list[str]) -> list[list[float]]:
         """批量生成嵌入向量。"""
