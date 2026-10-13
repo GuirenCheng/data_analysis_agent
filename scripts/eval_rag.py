@@ -19,7 +19,11 @@ DS-1000 每个问题天然是「题目(prompt) → 参考代码(reference_code)�
 用法:
     .venv/Scripts/python.exe scripts/eval_rag.py \
         --user-id 7c8765be-38f9-473c-90b7-99a09d6fbf46 \
-        [--sample 200] [--seed 42] [--rerank both] [--top-k 10] [--threshold 0.3]
+        [--sample 200] [--seed 42] [--rerank both] [--hybrid both] \
+        [--top-k 10] [--threshold 0.3]
+
+--rerank / --hybrid 均为 on/off/both 三个取值：both（默认）会跑两个开关的
+所有组合，用于对比「开/关某个环节」对 Recall@k / MRR 的影响。
 """
 
 import argparse
@@ -105,24 +109,26 @@ def print_table(max_k: int, results: dict[str, dict]) -> None:
     labels = list(results.keys())
     n = results[labels[0]]["n"]
     shown_ks = [k for k in KS if k <= max_k]
+    col_w = max(14, max(len(l) for l in labels) + 2)
+    total_w = 12 + col_w * len(labels)
 
-    print("\n" + "═" * 62)
+    print("\n" + "═" * total_w)
     print(f"样本 {n} 条 | 检索范围=code | top_k={max_k}")
-    print("─" * 62)
-    print("指标        " + "".join(f"{label:>14}" for label in labels))
-    print("─" * 62)
+    print("─" * total_w)
+    print("指标        " + "".join(f"{label:>{col_w}}" for label in labels))
+    print("─" * total_w)
     for k in shown_ks:
         row = f"Recall@{k:<3}   " + "".join(
-            f"{results[label]['recall'][k] * 100:>13.1f}%" for label in labels
+            f"{results[label]['recall'][k] * 100:>{col_w - 1}.1f}%" for label in labels
         )
         if k == 5:
             row += "   ← 主指标"
         print(row)
     mrr_row = f"MRR@{max_k:<3}     " + "".join(
-        f"{results[label]['mrr']:>14.3f}" for label in labels
+        f"{results[label]['mrr']:>{col_w}.3f}" for label in labels
     )
     print(mrr_row + "   ← 辅助指标")
-    print("═" * 62)
+    print("═" * total_w)
 
 
 async def main() -> None:
@@ -132,6 +138,8 @@ async def main() -> None:
     parser.add_argument("--seed", type=int, default=42, help="随机种子（保证可复现）")
     parser.add_argument("--rerank", choices=["on", "off", "both"], default="both",
                         help="rerank 开关对比（默认 both）")
+    parser.add_argument("--hybrid", choices=["on", "off", "both"], default="both",
+                        help="混合检索（词法召回）开关对比（默认 both）")
     parser.add_argument("--top-k", type=int, default=10,
                         help="检索的最大 k，报告 Recall@1/3/5/10 与 MRR@k")
     parser.add_argument("--threshold", type=float, default=None,
@@ -155,23 +163,27 @@ async def main() -> None:
     print(f"📥 加载 {len(queries)} 个 DS-1000 问题，抽样 {n_sample} 个（seed={args.seed}）")
 
     retriever = RAGRetriever()
-    modes: list[tuple[str, bool]] = []
-    if args.rerank in ("on", "both"):
-        modes.append(("rerank=on", True))
-    if args.rerank in ("off", "both"):
-        modes.append(("rerank=off", False))
+
+    # 两个正交维度：rerank 开关 × 混合检索（词法召回）开关
+    rerank_opts = [True] if args.rerank == "on" else (
+        [False] if args.rerank == "off" else [True, False])
+    hybrid_opts = [True] if args.hybrid == "on" else (
+        [False] if args.hybrid == "off" else [True, False])
 
     results: dict[str, dict] = {}
-    for label, enabled in modes:
-        settings.RERANK_ENABLED = enabled
-        print(f"\n>>> 评测 {label} ...")
-        t0 = time.time()
-        try:
-            results[label] = await run_eval(retriever, args.user_id, sampled, args.top_k)
-        except EmbeddingUnavailableError as e:
-            print(f"❌ 向量嵌入服务不可用，评测中止: {e}")
-            sys.exit(1)
-        print(f"    完成，耗时 {time.time() - t0:.1f}s")
+    for rerank_enabled in rerank_opts:
+        for hybrid_enabled in hybrid_opts:
+            label = f"rr={'on' if rerank_enabled else 'off'},hy={'on' if hybrid_enabled else 'off'}"
+            settings.RERANK_ENABLED = rerank_enabled
+            settings.HYBRID_RETRIEVAL_ENABLED = hybrid_enabled
+            print(f"\n>>> 评测 {label} ...")
+            t0 = time.time()
+            try:
+                results[label] = await run_eval(retriever, args.user_id, sampled, args.top_k)
+            except EmbeddingUnavailableError as e:
+                print(f"❌ 向量嵌入服务不可用，评测中止: {e}")
+                sys.exit(1)
+            print(f"    完成，耗时 {time.time() - t0:.1f}s")
 
     print_table(args.top_k, results)
 

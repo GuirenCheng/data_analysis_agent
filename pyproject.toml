@@ -37,6 +37,7 @@ dependencies = [
     "chromadb>=0.5.0",
     "langchain-chroma>=0.2.0",
     "tiktoken>=0.7.0",
+    "jieba>=0.42.1",  # 混合检索的中文分词（词法召回）
 
     # Database
     "sqlalchemy[asyncio]>=2.0.30",

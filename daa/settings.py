@@ -116,6 +116,18 @@ class Settings(BaseSettings):
     # 每个内容类型召回的候选数（rerank 前，越多召回越全、rerank 成本越高）
     RERANK_CANDIDATE_N: int = 30
 
+    # ── 混合检索（稠密向量 + 词法召回）──────────────────
+    # 稠密召回有语义天花板：跨语言（中文 query vs 英文代码）、罕见词、字面重叠
+    # 等情况，余弦相似度会失准。词法召回用查询分词后做子串匹配（近似 BM25），
+    # 把「字面命中」的文档也捞进候选池，最终交给 reranker 精排（天然融合器）。
+    HYBRID_RETRIEVAL_ENABLED: bool = True
+    # 每个关键词、每个内容类型最多召回多少条词法命中（子串匹配本身无分数，超出的截断）
+    LEXICAL_RECALL_K: int = 20
+    # 词法召回的关键词上限（分词后按词长降序取前 N 个，长词区分度更高）
+    LEXICAL_MAX_KEYWORDS: int = 8
+    # rerank 前候选池总量上限（稠密召回优先保留，词法命中补到上限）
+    RERANK_MAX_CANDIDATES: int = 200
+
 
 @lru_cache()
 def get_settings() -> Settings:
