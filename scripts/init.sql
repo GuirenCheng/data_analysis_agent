@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS analysis_steps (
     execution_success BOOLEAN,
     figures_collected JSON,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (session_id) REFERENCES analysis_sessions(id) ON DELETE CASCADE,
     INDEX idx_session_id (session_id),
     INDEX idx_session_round (session_id, round_number)
@@ -73,6 +74,7 @@ CREATE TABLE IF NOT EXISTS analysis_files (
     columns_detected JSON,
     row_count INT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     INDEX idx_user_id (user_id),
     INDEX idx_session_id (session_id)
@@ -91,6 +93,7 @@ CREATE TABLE IF NOT EXISTS user_configs (
     max_tokens INT DEFAULT 16384,
     default_max_rounds INT DEFAULT 20,
     default_output_dir VARCHAR(512) DEFAULT 'outputs',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
