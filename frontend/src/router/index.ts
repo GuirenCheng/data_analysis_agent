@@ -41,6 +41,11 @@ const router = createRouter({
           component: () => import("@/views/Report.vue"),
         },
         {
+          path: "analysis/:id/ppt",
+          name: "PptPreview",
+          component: () => import("@/views/PptPreview.vue"),
+        },
+        {
           path: "files",
           name: "Files",
           component: () => import("@/views/Files.vue"),

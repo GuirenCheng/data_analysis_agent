@@ -99,6 +99,31 @@ async def get_session_figure(
     return FileResponse(file_path)
 
 
+@router.get("/{session_id}/ppt")
+async def get_session_ppt(
+    session_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """按需生成并下载会话的分析报告 PPT（.pptx）。
+
+    首次访问触发 LLM 提炼大纲 + python-pptx 渲染，成功后缓存到会话目录；
+    后续访问直接返回缓存文件。与 figures 端点一致，支持 ``?token=`` 查询串
+    鉴权，供 ``<a download>`` 与前端预览器绕过 Authorization 头使用。
+    """
+    from daa.services.ppt_service import generate_ppt
+
+    ppt_path = await generate_ppt(db, session_id, user.id)
+    if not ppt_path:
+        raise HTTPException(status_code=404, detail="报告不存在或幻灯片生成失败")
+
+    return FileResponse(
+        ppt_path,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        filename="最终分析报告.pptx",
+    )
+
+
 @router.get("/{session_id}/stream")
 async def stream_progress(
     session_id: str,

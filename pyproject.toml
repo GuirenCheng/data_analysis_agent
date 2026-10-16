@@ -71,6 +71,7 @@ dependencies = [
 
     # Reports
     "python-docx>=0.8.11",
+    "python-pptx>=1.0.0",
 
     # Utilities
     "python-dotenv>=1.0.0",

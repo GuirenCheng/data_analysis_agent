@@ -5,6 +5,10 @@
         <el-icon><ArrowLeft /></el-icon> 返回分析详情
       </el-button>
       <h2>📄 最终分析报告</h2>
+      <template v-if="report">
+        <el-button @click="$router.push(`/analysis/${sessionId}/ppt`)">在线预览 PPT</el-button>
+        <el-button type="primary" @click="downloadPpt(sessionId)">下载 PPT</el-button>
+      </template>
     </div>
 
     <el-card v-loading="loading">
@@ -17,7 +21,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
-import { analysesApi } from "@/api/analyses";
+import { analysesApi, downloadPpt } from "@/api/analyses";
 import { renderMarkdown } from "@/utils/markdown";
 
 const route = useRoute();

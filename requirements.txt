@@ -38,6 +38,9 @@ asyncio-mqtt>=0.11.1
 # 文档生成（基于输出的Word文档）
 python-docx>=0.8.11
 
+# PPT 演示文稿生成（报告 → 幻灯片）
+python-pptx>=1.0.0
+
 # 系统和工具库
 pathlib2>=2.3.7
 typing-extensions>=4.5.0
