@@ -28,18 +28,34 @@ export function figureUrl(sessionId: string, filename: string): string {
   return `/api/v1/analyses/${sessionId}/figures/${encodeURIComponent(filename)}?token=${encodeURIComponent(token)}`;
 }
 
+// 通用下载：用隐藏 <a> 触发，可携带 filename
+function triggerDownload(url: string, filename: string): void {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 // 构建 PPT 文件的访问 URL（下载 / 预览均走此端点，服务端按需生成并缓存）
 export function pptUrl(sessionId: string): string {
   const token = localStorage.getItem("access_token") || "";
   return `/api/v1/analyses/${sessionId}/ppt?token=${encodeURIComponent(token)}`;
 }
 
-// 触发浏览器下载 .pptx（用隐藏 <a> 触发，可携带 filename）
+// 触发浏览器下载 .pptx
 export function downloadPpt(sessionId: string, filename = "最终分析报告.pptx"): void {
-  const a = document.createElement("a");
-  a.href = pptUrl(sessionId);
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  triggerDownload(pptUrl(sessionId), filename);
+}
+
+// 构建 Word 文件的访问 URL（服务端按需生成并缓存）
+export function docxUrl(sessionId: string): string {
+  const token = localStorage.getItem("access_token") || "";
+  return `/api/v1/analyses/${sessionId}/docx?token=${encodeURIComponent(token)}`;
+}
+
+// 触发浏览器下载 .docx
+export function downloadDocx(sessionId: string, filename = "最终分析报告.docx"): void {
+  triggerDownload(docxUrl(sessionId), filename);
 }

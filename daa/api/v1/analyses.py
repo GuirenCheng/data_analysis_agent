@@ -124,6 +124,31 @@ async def get_session_ppt(
     )
 
 
+@router.get("/{session_id}/docx")
+async def get_session_docx(
+    session_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """按需生成并下载会话的分析报告 Word 文档（.docx）。
+
+    Word 是报告的忠实转换（Markdown → docx），不调用 LLM；首次访问生成后
+    缓存到会话目录。与 figures / ppt 端点一致，支持 ``?token=`` 查询串鉴权，
+    供 ``<a download>`` 绕过 Authorization 头使用。
+    """
+    from daa.services.docx_service import generate_docx
+
+    docx_path = await generate_docx(db, session_id, user.id)
+    if not docx_path:
+        raise HTTPException(status_code=404, detail="报告不存在或 Word 生成失败")
+
+    return FileResponse(
+        docx_path,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename="最终分析报告.docx",
+    )
+
+
 @router.get("/{session_id}/stream")
 async def stream_progress(
     session_id: str,

@@ -8,6 +8,7 @@
       <template v-if="report">
         <el-button @click="$router.push(`/analysis/${sessionId}/ppt`)">在线预览 PPT</el-button>
         <el-button type="primary" @click="downloadPpt(sessionId)">下载 PPT</el-button>
+        <el-button @click="downloadDocx(sessionId)">下载 Word</el-button>
       </template>
     </div>
 
@@ -21,7 +22,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
-import { analysesApi, downloadPpt } from "@/api/analyses";
+import { analysesApi, downloadDocx, downloadPpt } from "@/api/analyses";
 import { renderMarkdown } from "@/utils/markdown";
 
 const route = useRoute();
