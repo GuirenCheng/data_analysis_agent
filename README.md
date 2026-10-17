@@ -16,7 +16,8 @@
 - 🎯 **自然语言驱动**：用中文描述分析需求，LLM 自动规划分析步骤并生成代码
 - 🔄 **多轮迭代分析**：基于 LangGraph 状态机实现 LLM 规划 → 代码生成 → 沙箱执行 → 图表采集 → 报告生成的自动化闭环
 - 📊 **智能可视化**：自动生成高质量 matplotlib 图表，支持中文显示（SimHei 字体）
-- 📝 **报告生成**：自动生成结构化 Markdown 报告，支持转为 Word 文档
+- 📝 **报告生成**：自动生成结构化 Markdown 报告，支持一键导出 Word 文档（python-docx）
+- 📽️ **PPT 自动化**：LLM 提炼大纲 + python-pptx 渲染演示文稿，支持浏览器在线预览与下载
 - 🛡️ **安全沙箱**：AST 白名单检查，拦截 `exec`/`eval`/`subprocess` 等危险调用，保障 LLM 生成代码安全执行
 - 🔍 **RAG 检索增强**：基于 ChromaDB 向量数据库对历史分析进行语义索引，在新分析中注入相似案例作为参考
 - 👥 **多用户支持**：JWT 认证、会话隔离、用户级 LLM 配置
@@ -31,7 +32,7 @@ data_analysis_agent/
 │   │   ├── auth.py             #   注册 / 登录 / Token 刷新
 │   │   ├── users.py            #   用户资料管理
 │   │   ├── sessions.py         #   分析会话 CRUD
-│   │   ├── analyses.py         #   步骤查询 / 报告获取 / SSE 进度流 / 取消
+│   │   ├── analyses.py         #   步骤查询 / 报告 / PPT & Word 下载 / SSE 进度流 / 取消
 │   │   ├── files.py            #   文件上传 / 列表 / 预览 / 删除
 │   │   ├── configs.py          #   用户 LLM 配置管理
 │   │   ├── rag.py              #   RAG 语义搜索
@@ -42,6 +43,8 @@ data_analysis_agent/
 │   │   ├── protocol.py         #   YAML 协议解析与代码提取
 │   │   ├── prompts.py          #   系统提示词模板（含 RAG 上下文注入）
 │   │   ├── reporter.py         #   报告生成与保存
+│   │   ├── slides.py           #   PPT 大纲提炼 + python-pptx 渲染
+│   │   ├── docx_gen.py         #   Markdown → Word（python-docx）渲染
 │   │   └── executor_registry.py # 执行器内存注册表（解决 IPython 不可序列化问题）
 │   ├── workflow/               # LangGraph 状态机工作流
 │   │   ├── graph.py            #   状态图构建与编译（MemorySaver checkpoint）
@@ -70,6 +73,8 @@ data_analysis_agent/
 │   │   ├── file_service.py     #   文件管理
 │   │   ├── config_service.py   #   用户配置
 │   │   ├── report_service.py   #   报告查询
+│   │   ├── ppt_service.py      #   PPT 按需生成与磁盘缓存
+│   │   ├── docx_service.py     #   Word 按需生成与磁盘缓存
 │   │   └── rag_service.py      #   RAG 索引 / 检索
 │   ├── db/                     # 数据库与缓存
 │   │   ├── session.py          #   SQLAlchemy 异步会话工厂
@@ -95,10 +100,10 @@ data_analysis_agent/
 │       ├── api/                #   Axios API 层（auth / sessions / analyses / files / rag）
 │       ├── stores/             #   Pinia 状态管理（auth / analysis）
 │       ├── router/             #   Vue Router（含 auth guards）
-│       ├── views/              #   页面组件（Dashboard / AnalysisCreate / Report / Files / Settings / RagSearch）
+│       ├── views/              #   页面组件（Dashboard / AnalysisCreate / Report / PptPreview / Files / Settings / RagSearch）
 │       └── components/         #   通用组件（Layout）
 ├── tests/                      # 测试
-│   ├── test_core/              #   核心模块测试（safety / executor / protocol）
+│   ├── test_core/              #   核心模块测试（safety / executor / protocol / slides / docx）
 │   └── test_workflow/          #   工作流路由测试
 ├── alembic/                    # 数据库迁移
 ├── scripts/init.sql            # MySQL 初始化 DDL
@@ -372,6 +377,7 @@ A: LLM prompt 中已要求自动尝试 `['utf-8', 'gbk', 'gb18030', 'gb2312']` �
 - 🔄 LangGraph 状态机替代 while 循环
 - 🔍 集成 ChromaDB RAG 检索增强
 - 🎨 Vue 3 前端 + SSE 实时进度
+- 📽️ PPT 自动生成与在线预览（LLM 提炼大纲 + python-pptx）
 - 🐳 Docker Compose 一键部署
 - 👥 JWT 多用户认证
 - ⚡ ARQ 异步任务队列
