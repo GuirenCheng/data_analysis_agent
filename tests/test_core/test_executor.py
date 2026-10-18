@@ -86,3 +86,19 @@ def test_execute_truncates_large_output(executor):
     assert result["success"]
     assert len(result["output"]) < 100000
     assert "[输出过长已截断" in result["output"]
+
+
+def test_reset_all_clears_shared_shell(tmp_path):
+    """reset_all 应清空共享 IPython shell 的变量，保证会话间隔离。"""
+    from daa.core.executor_registry import get_or_create_executor, reset_all
+
+    ex1 = get_or_create_executor(str(tmp_path / "session_a"))
+    ex2 = get_or_create_executor(str(tmp_path / "session_b"))
+    ex1.execute_code("x = 42")
+
+    # 共享单例 shell：另一个会话的执行器能读到 x（这是并发隐患的根源）
+    assert ex2.execute_code("print(x)")["success"]
+
+    reset_all()
+    # 重置后 x 应消失
+    assert not ex1.execute_code("print(x)")["success"]

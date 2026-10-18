@@ -43,7 +43,10 @@ class WorkerSettings:
 
     functions = [run_analysis_task]
     redis_settings = RedisSettings.from_dsn(get_settings().REDIS_URL)
-    max_jobs: int = 4  # 最大并发分析任务数
+    # 并发分析任务数。必须为 1：所有会话共享同一个 IPython 单例 shell
+    # （InteractiveShell.instance()），>1 时并发任务的变量会互相串味。
+    # 需要真并发时应改为多 worker 进程（每进程独立 shell），而不是调大此值。
+    max_jobs: int = 1
     job_timeout: int = 3600  # 单任务最多 1 小时
     poll_delay: float = 0.5
     on_startup = startup

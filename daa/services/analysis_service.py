@@ -5,7 +5,7 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from daa.core.executor_registry import remove_executor
+from daa.core.executor_registry import remove_executor, reset_all
 from daa.db.redis import cache, get_redis
 from daa.models.analysis_step import AnalysisStep
 from daa.models.session import AnalysisSession
@@ -38,6 +38,10 @@ async def run_analysis(
         最终状态字典
     """
     graph = get_analysis_graph()
+
+    # 每个任务开始前重置执行环境。worker 串行执行（max_jobs=1），但所有会话
+    # 仍共享同一个 IPython 单例 shell，重置确保上个会话的变量/执行器不残留。
+    reset_all()
 
     # 检索相关历史分析作为 RAG 上下文（失败时静默跳过，不影响主流程）
     rag_context = ""

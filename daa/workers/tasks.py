@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from daa.core.executor_registry import remove_executor, reset_all
+from daa.core.executor_registry import reset_all
 from daa.db.redis import cache, get_redis
 from daa.services.analysis_service import run_analysis
 from daa.settings import get_settings
@@ -150,7 +150,7 @@ async def run_analysis_task(
         except Exception:
             pass
 
-        # 清理执行器
-        remove_executor(f"{output_dir}/session_*")
+        # 清理执行环境（原 remove_executor 传的是通配符，匹配不到任何注册键）
+        reset_all()
 
         raise
