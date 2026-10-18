@@ -2,7 +2,7 @@
 
 import pytest
 
-from daa.core.executor import CodeExecutor
+from daa.core.executor import CodeExecutor, truncate_text
 
 
 @pytest.fixture
@@ -65,3 +65,24 @@ def test_reset_environment(executor):
     # 重置后 x 不应存在
     result = executor.execute_code("print(x)")
     assert not result["success"]
+
+
+def test_truncate_text():
+    """超长文本应被截断并保留首尾，未超长则原样返回。"""
+    short = "hello"
+    assert truncate_text(short) == short
+
+    long = "a" * 10000
+    out = truncate_text(long, max_chars=100)
+    assert len(out) < 10000
+    assert "[输出过长已截断" in out
+    assert out.startswith("a" * 50)  # 保留头部
+    assert out.endswith("a" * 50)  # 保留尾部
+
+
+def test_execute_truncates_large_output(executor):
+    """超大 stdout 输出应被截断，防止撑爆 LLM 上下文。"""
+    result = executor.execute_code("print('x' * 100000)")
+    assert result["success"]
+    assert len(result["output"]) < 100000
+    assert "[输出过长已截断" in result["output"]

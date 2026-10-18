@@ -18,6 +18,21 @@ from daa.core.safety import check_code_safety
 # 预导入的数据科学库模块（用于环境信息展示）
 _DATA_MODULE_ROOTS = {"pandas", "numpy", "matplotlib", "duckdb", "scipy", "sklearn"}
 
+# 执行输出 / 异常回溯的硬截断上限（字符）。防止一次超大 print / 表 / 回溯
+# 撑爆 LLM 上下文；保留首尾，确保关键信息（表头 + 末尾数据 / 报错位置）仍在。
+MAX_OUTPUT_CHARS = 4000
+
+
+def truncate_text(text: str, max_chars: int = MAX_OUTPUT_CHARS) -> str:
+    """截断超长文本，保留头部与尾部，中间插入省略标记。"""
+    text = text or ""
+    if len(text) <= max_chars:
+        return text
+    head = max_chars // 2
+    tail = max_chars - head
+    marker = f"\n...\n[输出过长已截断，原始 {len(text)} 字符]\n...\n"
+    return text[:head] + marker + text[-tail:]
+
 
 class CodeExecutor:
     """安全的代码执行器 — 限制依赖库，捕获输出，支持图片保存。"""
@@ -105,7 +120,7 @@ from IPython.display import display
             return {
                 "success": False,
                 "output": "",
-                "error": f"代码安全检查失败: {safety_error}",
+                "error": truncate_text(f"代码安全检查失败: {safety_error}"),
                 "variables": {},
             }
 
@@ -120,8 +135,8 @@ from IPython.display import display
                 err = result.error_before_exec
                 return {
                     "success": False,
-                    "output": captured.stdout or "",
-                    "error": f"执行前错误: {type(err).__name__}: {err}",
+                    "output": truncate_text(captured.stdout or ""),
+                    "error": truncate_text(f"执行前错误: {type(err).__name__}: {err}"),
                     "variables": {},
                 }
 
@@ -129,8 +144,8 @@ from IPython.display import display
                 err = result.error_in_exec
                 return {
                     "success": False,
-                    "output": captured.stdout or "",
-                    "error": f"执行错误: {type(err).__name__}: {err}",
+                    "output": truncate_text(captured.stdout or ""),
+                    "error": truncate_text(f"执行错误: {type(err).__name__}: {err}"),
                     "variables": {},
                 }
 
@@ -140,6 +155,9 @@ from IPython.display import display
             if result.result is not None:
                 formatted = self._format_table_output(result.result)
                 output += f"\n{formatted}"
+
+            # 硬截断：防止一次超大输出撑爆后续 LLM 上下文
+            output = truncate_text(output)
 
             # 检测新变量
             vars_after = set(self.shell.user_ns.keys())
@@ -171,8 +189,8 @@ from IPython.display import display
             captured_output_text = captured.stdout if captured else ""
             return {
                 "success": False,
-                "output": captured_output_text,
-                "error": f"执行异常: {e}\n{traceback.format_exc()}",
+                "output": truncate_text(captured_output_text),
+                "error": truncate_text(f"执行异常: {e}\n{traceback.format_exc()}"),
                 "variables": {},
             }
 
